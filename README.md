@@ -1,6 +1,6 @@
 ---
 
-<h1 align="center">Sleepagotchi Lite Bot</h1>
+<h1 align="center">sleepagotchiLITE_bot</h1>
 
 <p align="center">Automate tasks in Sleepagotchi Lite to save time and boost your gameplay!</p>
 
@@ -8,7 +8,7 @@
 
 ## 🚀 **About the Bot**
 
-The **Sleepagotchi Lite Bot** is designed to automate various in-game tasks in **Sleepagotchi Lite**, including:
+The **sleepagotchiLITE_bot** is designed to automate various in-game tasks in **Sleepagotchi Lite**, including:
 
 - **Automatic Gacha Spins**  
   Spin the gacha automatically to grab your favorite items.
@@ -29,12 +29,13 @@ With this bot, you can optimize your gameplay and focus on strategy rather than 
 
 ---
 
-## 🌟 **Version v1.0.0**
+## 🌟 **Version v1.1.0**
 
 ### **Updates**
 
-- **Initial Release**: Sleepagotchi Lite Bot is now available with core automation features.
-- **Enhanced Configuration**: Easily customize your automation settings via the `config.json` file.
+- **Gacha System Fixes:** Improved the gacha system for more reliable spins.
+- **Hero Management Enhancements:** Refined hero management automation for better performance.
+- **Challenge System Fixes:** Fixed issues in sending heroes to challenges.
 
 Stay tuned for further updates and improvements! ✨
 
@@ -42,9 +43,13 @@ Stay tuned for further updates and improvements! ✨
 
 ## 📥 **How to Register**
 
-To start using the Sleepagotchi Lite Bot, simply contact the bot via Telegram:
+To start using the **sleepagotchiLITE_bot**, simply contact the bot via Telegram:
 
-**Telegram Username:** @sleepagotchiLITE_bot
+<div align="center">
+  <a href="https://t.me/sleepagotchiLITE_bot/game?startapp=72633a35343338323039363434" target="_blank">
+    <img src="https://img.shields.io/static/v1?message=sleepagotchiLITE_bot&logo=telegram&label=&color=2CA5E0&logoColor=white&labelColor=&style=for-the-badge" height="25" alt="telegram logo" />
+  </a>
+</div>
 
 ---
 

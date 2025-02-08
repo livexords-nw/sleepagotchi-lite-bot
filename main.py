@@ -29,6 +29,7 @@ class sleepagotchi:
         self.green_stones = 0
         self.purple_stones = 0
         self.coin = 0
+        self.gem = 0
 
     def banner(self) -> None:
         """Displays the banner for the bot."""
@@ -128,8 +129,9 @@ class sleepagotchi:
 
                 self.gachaPoint = gacha
                 self.green_stones = green_stones
-                self.green_stones = purple_stones
+                self.purple_stones = purple_stones
                 self.coin = gold
+                self.gem = gem
 
                 # Display a user-friendly success message with emojis
                 self.log("✅ Login successful! Welcome aboard!", Fore.GREEN)
@@ -160,14 +162,14 @@ class sleepagotchi:
             self.log(f"📄 Response content: {response.text}", Fore.RED)
 
     def spin_gacha(self) -> None:
-        # Continue spinning until there are no gacha spins left.
-        while self.gachaPoint > 0:
+        # Continue spinning until there are no paid gacha spins left.
+        while self.gachaPoint > 0 or self.gem >= 500:
             self.log("🎰 Initiating gacha spin...", Fore.GREEN)
 
             # Construct the URL using self.token for authentication.
             url = f"{self.BASE_URL}spendGacha?{self.token}"
             headers = {**self.HEADERS}
-            # Define the JSON payload for the POST request.
+            # Define the JSON payload for the POST request with strategy "gacha".
             payload = {"amount": 1, "strategy": "gacha"}
 
             try:
@@ -216,6 +218,48 @@ class sleepagotchi:
                 break
 
         self.log("😢 No more gacha spins left. Please try again later!", Fore.YELLOW)
+
+        # --- API Gacha Free Spin ---
+        self.log("🎰 Initiating free gacha spin...", Fore.GREEN)
+
+        # Gunakan payload dengan strategy "free"
+        free_payload = {"amount": 1, "strategy": "free"}
+        free_url = f"{self.BASE_URL}spendGacha?{self.token}"
+        try:
+            self.log("📡 Sending free gacha request...", Fore.CYAN)
+            free_response = requests.post(free_url, headers=self.HEADERS, json=free_payload)
+            free_response.raise_for_status()
+            free_data = free_response.json()
+
+            # Retrieve the heroes from the free spin response.
+            free_heroes = free_data.get("heroes", [])
+            if free_heroes:
+                self.log("🎉 Free gacha spin successful! You've received the following heroes:", Fore.GREEN)
+                for hero in free_heroes:
+                    name = hero.get("name", "Unknown")
+                    hero_type = hero.get("heroType", "Unknown")
+                    hero_class = hero.get("class", "Unknown")
+                    rarity = hero.get("rarity", "Unknown")
+                    power = hero.get("power", "Unknown")
+                    self.log(
+                        f"🦸 Name: {name} | 🏷️ Type: {hero_type} | 🛡️ Class: {hero_class} | ⭐ Rarity: {rarity} | ⚡ Power: {power}",
+                        Fore.LIGHTGREEN_EX,
+                    )
+            else:
+                self.log("⚠️ Free gacha spin failed: No heroes received.", Fore.YELLOW)
+
+        except requests.exceptions.RequestException as e:
+            self.log(f"❌ Request error during free gacha spin: {e}", Fore.RED)
+            self.log(f"📄 Response content: {free_response.text}", Fore.RED)
+        except ValueError as e:
+            self.log(f"❌ JSON decode error during free gacha spin: {e}", Fore.RED)
+            self.log(f"📄 Response content: {free_response.text}", Fore.RED)
+        except KeyError as e:
+            self.log(f"❌ Missing expected data during free gacha spin: {e}", Fore.RED)
+            self.log(f"📄 Response content: {free_response.text}", Fore.RED)
+        except Exception as e:
+            self.log(f"❌ Unexpected error during free gacha spin: {e}", Fore.RED)
+            self.log(f"📄 Response content: {free_response.text}", Fore.RED)
     
     def heroes(self) -> None:
 
@@ -227,7 +271,8 @@ class sleepagotchi:
             safe_formula = formula.replace('^', '**')
             try:
                 # Batasi builtins untuk keamanan (meskipun tidak 100% aman)
-                return eval(safe_formula, {"__builtins__": {}}, {"level": level, "star": star})
+                result = eval(safe_formula, {"__builtins__": {}}, {"level": level, "star": star})
+                return int(result)
             except Exception as e:
                 self.log(f"❌ Error evaluating formula '{formula}': {e}", Fore.RED)
                 return 0
@@ -403,8 +448,8 @@ class sleepagotchi:
 
     def send_heroes_to_challenges(self) -> None:
         self.log("🚀 Initiating mission deployment...", Fore.GREEN)
-        
-        # STEP 1: Fetch available heroes from getUserData.
+
+        # STEP 1: Ambil data hero dari getUserData.
         try:
             heroes_url = f"{self.BASE_URL}getUserData?{self.token}"
             hero_response = requests.get(heroes_url, headers=self.HEADERS)
@@ -418,9 +463,10 @@ class sleepagotchi:
             self.log(f"🤩 Retrieved {len(available_heroes)} heroes from your user data.", Fore.CYAN)
         except requests.exceptions.RequestException as e:
             self.log(f"❌ Error fetching heroes: {e}", Fore.RED)
+            self.log(f"📄 Response content: {hero_response.text}", Fore.RED)
             return
 
-        # STEP 2: Retrieve missions (constellations)
+        # STEP 2: Ambil daftar misi (constellations)
         try:
             constellations_payload = {"startIndex": 0, "amount": 6}
             constellations_url = f"{self.BASE_URL}getConstellations?{self.token}"
@@ -434,72 +480,82 @@ class sleepagotchi:
             self.log(f"✨ Retrieved {len(constellations)} missions.", Fore.CYAN)
         except requests.exceptions.RequestException as e:
             self.log(f"❌ Error fetching missions: {e}", Fore.RED)
+            self.log(f"📄 Response content: {constellation_response.text}", Fore.RED)
             return
 
-        # To avoid sending the same hero to multiple missions, maintain a set of used heroes.
+        # Untuk mencegah penggunaan hero yang sama di misi berbeda, simpan hero yang sudah dipakai.
         used_heroes = set()
 
-        # STEP 3: Process each constellation (mission)
+        # STEP 3: Proses setiap misi (constellation)
         for constellation in constellations:
             constellation_name = constellation.get("name", "Unknown Mission")
-            self.log(f"\n🔸 Processing mission: {constellation_name}", Fore.CYAN)
+            progress = constellation.get("progress", 0)
+            if progress == 100:
+                self.log(f"⚠️ Skipping mission '{constellation_name}' as its progress is 100.", Fore.YELLOW)
+                continue
+
+            self.log(f"🔸 Processing mission: {constellation_name} (Progress: {progress}%)", Fore.CYAN)
             challenges = constellation.get("challenges", [])
-            
-            # Flag to mark if a hero has been successfully sent for this mission.
             mission_started = False
-            
-            # Iterate over challenges in the mission.
+
+            # Proses tiap challenge dalam misi
             for challenge in challenges:
                 challenge_name = challenge.get("name", "Unnamed Challenge")
                 challenge_type = challenge.get("challengeType", "UnknownType")
-                required_skill = challenge.get("heroSkill", "").lower()  # e.g., "element1"
-                self.log(f"🔎 Evaluating challenge: {challenge_name} [{challenge_type}] (Required skill: {required_skill})", Fore.CYAN)
+                required_skill = challenge.get("heroSkill", "").lower()  # misalnya "element1"
+                challenge_time = challenge.get("time", 120)  # Menggunakan nilai waktu dari response, default 120 jika tidak ada
+                self.log(f"🔎 Evaluating challenge: {challenge_name} [{challenge_type}] (Required skill: {required_skill}, Time: {challenge_time})", Fore.CYAN)
 
-                # Prepare assignments for this challenge.
-                assignment = None
                 ordered_slots = challenge.get("orderedSlots", [])
-                for slot in ordered_slots:
-                    # Only consider empty slots.
-                    if slot.get("occupiedBy", "").lower() != "empty":
-                        continue
+                assignments = []    # Kumpulan penugasan hero untuk challenge ini
+                local_used = set()  # Hero yang akan dipakai untuk challenge ini
 
-                    required_class = slot.get("heroClass", "").lower()  # e.g., "ranger", "defender", or "mage"
-                    # Search for a hero in available_heroes that hasn't been used yet.
+                # Coba assign hero untuk setiap slot kosong
+                for idx, slot in enumerate(ordered_slots):
+                    if slot.get("occupiedBy", "").lower() != "empty":
+                        continue  # Lewati slot yang sudah terisi
+
+                    required_class = slot.get("heroClass", "").lower()  # misalnya "ranger", "mage", atau "defender"
                     for hero in available_heroes:
                         hero_identifier = hero.get("heroType")
-                        if hero_identifier in used_heroes:
+                        # Pastikan hero belum digunakan secara global atau di challenge ini
+                        if hero_identifier in used_heroes or hero_identifier in local_used:
                             continue
 
                         hero_class = hero.get("class", "").lower()
                         hero_skill = hero.get("skill", "").lower()
                         if hero_class == required_class and hero_skill == required_skill:
-                            # Found a matching hero.
-                            slot_id = ordered_slots.index(slot)  # Use the index in the ordered_slots list.
-                            assignment = {"slotId": slot_id, "heroType": hero_identifier}
-                            used_heroes.add(hero_identifier)
-                            self.log(f"✅ Assigned hero '{hero.get('name')}' (Type: {hero_identifier}) to slot {slot_id} for challenge '{challenge_name}'", Fore.LIGHTGREEN_EX)
-                            break  # Stop searching further heroes for this slot.
-                    if assignment:
-                        # We found a hero for one slot; no need to fill all slots.
-                        break
+                            assignments.append({"slotId": idx, "heroType": hero_identifier})
+                            local_used.add(hero_identifier)
+                            self.log(
+                                f"✅ Assigned hero '{hero.get('name')}' (Type: {hero_identifier}) to slot {idx} for challenge '{challenge_name}'",
+                                Fore.LIGHTGREEN_EX
+                            )
+                            break  # Setelah menemukan hero untuk slot ini, lanjut ke slot berikutnya
 
-                # STEP 4: If a hero was assigned, send it to the challenge and then move on to the next mission.
-                if assignment:
-                    send_payload = {"challengeType": challenge_type, "heroes": [assignment]}
+                # Jika ada minimal 1 hero yang diassign, kirim payload ke API
+                if assignments:
+                    used_heroes.update(local_used)
+                    send_payload = {
+                        "challengeType": challenge_type,
+                        "heroes": assignments,
+                        "time": challenge_time  # Sertakan waktu sesuai dengan nilai di challenge response
+                    }
                     try:
-                        self.log(f"🚀 Sending assigned hero for challenge '{challenge_name}'...", Fore.CYAN)
+                        self.log(f"🚀 Sending assigned heroes for challenge '{challenge_name}'...", Fore.CYAN)
                         send_url = f"{self.BASE_URL}sendToChallenge?{self.token}"
                         send_response = requests.post(send_url, headers=self.HEADERS, json=send_payload)
                         send_response.raise_for_status()
                         send_data = send_response.json()
                         if send_data.get("success", False):
-                            self.log(f"🎉 Mission '{challenge_name}' started successfully!", Fore.GREEN)
+                            self.log(f"🎉 Challenge '{challenge_name}' started successfully with {len(assignments)} hero(s)!", Fore.GREEN)
                             mission_started = True
-                            break  # Move to the next mission since one challenge is now active.
+                            break  # Selesai dengan challenge ini, lanjut ke misi berikutnya
                         else:
-                            self.log(f"⚠️ Mission '{challenge_name}' failed to start.", Fore.YELLOW)
+                            self.log(f"⚠️ Challenge '{challenge_name}' failed to start.", Fore.YELLOW)
                     except requests.exceptions.RequestException as e:
-                        self.log(f"❌ Error sending hero for challenge '{challenge_name}': {e}", Fore.RED)
+                        self.log(f"❌ Error sending heroes for challenge '{challenge_name}': {e}", Fore.RED)
+                        self.log(f"📄 Response content: {send_response.text}", Fore.RED)
                 else:
                     self.log(f"⚠️ No suitable hero found for challenge '{challenge_name}'.", Fore.YELLOW)
 
