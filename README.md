@@ -27,15 +27,15 @@ The **sleepagotchiLITE_bot** is designed to automate various in-game tasks in **
 
 With this bot, you can optimize your gameplay and focus on strategy rather than repetitive manual tasks.
 
+Below is the updated version information with the previous update details removed. The new update focuses solely on fixing the gacha system using gems:
+
 ---
 
-## 🌟 **Version v1.1.0**
+## 🌟 **Version v1.1.1**
 
 ### **Updates**
 
-- **Gacha System Fixes:** Improved the gacha system for more reliable spins.
-- **Hero Management Enhancements:** Refined hero management automation for better performance.
-- **Challenge System Fixes:** Fixed issues in sending heroes to challenges.
+- **Gacha System Enhancement:** Fixed issues with gem-based gacha spins to improve reliability and user experience.
 
 Stay tuned for further updates and improvements! ✨
 

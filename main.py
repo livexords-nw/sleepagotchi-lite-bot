@@ -162,76 +162,125 @@ class sleepagotchi:
             self.log(f"📄 Response content: {response.text}", Fore.RED)
 
     def spin_gacha(self) -> None:
-        # Continue spinning until there are no paid gacha spins left.
-        while self.gachaPoint > 0 or self.gem >= 500:
-            self.log("🎰 Initiating gacha spin...", Fore.GREEN)
-
-            # Construct the URL using self.token for authentication.
+        """
+        Perform a series of gacha spins using different strategies:
+        - Paid gacha spins (using self.gachaPoint)
+        - Gem-based gacha spins (if self.gem >= 500)
+        - One free gacha spin
+        """
+        # --- Paid Gacha Spins ---
+        while self.gachaPoint > 0:
+            self.log("🎰 Initiating paid gacha spin...", Fore.GREEN)
             url = f"{self.BASE_URL}spendGacha?{self.token}"
-            headers = {**self.HEADERS}
-            # Define the JSON payload for the POST request with strategy "gacha".
+            headers = self.HEADERS.copy()
             payload = {"amount": 1, "strategy": "gacha"}
 
             try:
-                self.log("📡 Sending gacha request...", Fore.CYAN)
+                self.log("📡 Sending paid gacha request...", Fore.CYAN)
                 response = requests.post(url, headers=headers, json=payload)
                 response.raise_for_status()
                 data = response.json()
 
-                # Retrieve the heroes from the response.
                 heroes = data.get("heroes", [])
                 if heroes:
-                    self.log("🎉 Gacha spin successful! You've received the following heroes:", Fore.GREEN)
+                    self.log("🎉 Paid gacha spin successful! You've received the following heroes:", Fore.GREEN)
                     for hero in heroes:
                         name = hero.get("name", "Unknown")
                         hero_type = hero.get("heroType", "Unknown")
                         hero_class = hero.get("class", "Unknown")
                         rarity = hero.get("rarity", "Unknown")
                         power = hero.get("power", "Unknown")
-                        # Display key information about each hero.
                         self.log(
                             f"🦸 Name: {name} | 🏷️ Type: {hero_type} | 🛡️ Class: {hero_class} | ⭐ Rarity: {rarity} | ⚡ Power: {power}",
                             Fore.LIGHTGREEN_EX,
                         )
                 else:
-                    self.log("⚠️ Gacha spin failed: No heroes received.", Fore.YELLOW)
+                    self.log("⚠️ Paid gacha spin failed: No heroes received.", Fore.YELLOW)
 
-                # Deduct one gacha spin after each request, regardless of the outcome.
                 self.gachaPoint -= 1
-                self.log(f"🔄 Remaining gacha spins: {self.gachaPoint}", Fore.CYAN)
+                self.log(f"🔄 Remaining paid gacha spins: {self.gachaPoint}", Fore.CYAN)
 
             except requests.exceptions.RequestException as e:
-                self.log(f"❌ Request error during gacha spin: {e}", Fore.RED)
+                self.log(f"❌ Request error during paid gacha spin: {e}", Fore.RED)
                 self.log(f"📄 Response content: {response.text}", Fore.RED)
                 break
             except ValueError as e:
-                self.log(f"❌ JSON decode error during gacha spin: {e}", Fore.RED)
+                self.log(f"❌ JSON decode error during paid gacha spin: {e}", Fore.RED)
                 self.log(f"📄 Response content: {response.text}", Fore.RED)
                 break
             except KeyError as e:
-                self.log(f"❌ Missing expected data during gacha spin: {e}", Fore.RED)
+                self.log(f"❌ Missing expected data during paid gacha spin: {e}", Fore.RED)
                 self.log(f"📄 Response content: {response.text}", Fore.RED)
                 break
             except Exception as e:
-                self.log(f"❌ Unexpected error during gacha spin: {e}", Fore.RED)
+                self.log(f"❌ Unexpected error during paid gacha spin: {e}", Fore.RED)
                 self.log(f"📄 Response content: {response.text}", Fore.RED)
                 break
 
-        self.log("😢 No more gacha spins left. Please try again later!", Fore.YELLOW)
+        if self.gachaPoint <= 0:
+            self.log("😢 No more paid gacha spins left. Please try again later!", Fore.YELLOW)
 
-        # --- API Gacha Free Spin ---
+        # --- Gem Gacha Spins ---
+        while self.gem >= 500:
+            self.log("🎰 Initiating gem gacha spin...", Fore.GREEN)
+            url = f"{self.BASE_URL}spendGacha?{self.token}"
+            headers = self.HEADERS.copy()
+            payload = {"amount": 1, "strategy": "gem"}
+
+            try:
+                self.log("📡 Sending gem gacha request...", Fore.CYAN)
+                response = requests.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                data = response.json()
+
+                heroes = data.get("heroes", [])
+                if heroes:
+                    self.log("🎉 Gem gacha spin successful! You've received the following heroes:", Fore.GREEN)
+                    for hero in heroes:
+                        name = hero.get("name", "Unknown")
+                        hero_type = hero.get("heroType", "Unknown")
+                        hero_class = hero.get("class", "Unknown")
+                        rarity = hero.get("rarity", "Unknown")
+                        power = hero.get("power", "Unknown")
+                        self.log(
+                            f"🦸 Name: {name} | 🏷️ Type: {hero_type} | 🛡️ Class: {hero_class} | ⭐ Rarity: {rarity} | ⚡ Power: {power}",
+                            Fore.LIGHTGREEN_EX,
+                        )
+                else:
+                    self.log("⚠️ Gem gacha spin failed: No heroes received.", Fore.YELLOW)
+
+                # Adjust the paid gacha spin counter or gems as needed by your game logic.
+                self.gachaPoint -= 1
+                self.log(f"🔄 Remaining paid gacha spins: {self.gachaPoint}", Fore.CYAN)
+
+            except requests.exceptions.RequestException as e:
+                self.log(f"❌ Request error during gem gacha spin: {e}", Fore.RED)
+                self.log(f"📄 Response content: {response.text}", Fore.RED)
+                break
+            except ValueError as e:
+                self.log(f"❌ JSON decode error during gem gacha spin: {e}", Fore.RED)
+                self.log(f"📄 Response content: {response.text}", Fore.RED)
+                break
+            except KeyError as e:
+                self.log(f"❌ Missing expected data during gem gacha spin: {e}", Fore.RED)
+                self.log(f"📄 Response content: {response.text}", Fore.RED)
+                break
+            except Exception as e:
+                self.log(f"❌ Unexpected error during gem gacha spin: {e}", Fore.RED)
+                self.log(f"📄 Response content: {response.text}", Fore.RED)
+                break
+
+        # --- Free Gacha Spin ---
         self.log("🎰 Initiating free gacha spin...", Fore.GREEN)
-
-        # Gunakan payload dengan strategy "free"
-        free_payload = {"amount": 1, "strategy": "free"}
         free_url = f"{self.BASE_URL}spendGacha?{self.token}"
+        free_payload = {"amount": 1, "strategy": "free"}
+
         try:
             self.log("📡 Sending free gacha request...", Fore.CYAN)
             free_response = requests.post(free_url, headers=self.HEADERS, json=free_payload)
             free_response.raise_for_status()
             free_data = free_response.json()
 
-            # Retrieve the heroes from the free spin response.
             free_heroes = free_data.get("heroes", [])
             if free_heroes:
                 self.log("🎉 Free gacha spin successful! You've received the following heroes:", Fore.GREEN)
