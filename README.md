@@ -6,36 +6,31 @@
 
 ---
 
-## 🚀 **About the Bot**
+## 🚀 About the Bot
 
-The **sleepagotchiLITE_bot** is designed to automate various in-game tasks in **Sleepagotchi Lite**, including:
+The **sleepagotchiLITE_bot** is an advanced automation tool designed for Sleepagotchi Lite that streamlines in-game tasks so you can focus on strategy rather than repetitive actions. It features:
 
-- **Automatic Gacha Spins**  
-  Spin the gacha automatically to grab your favorite items.
+- **Auto Daily:** Automatically claim your daily rewards.
+- **Missions & Auto Tasks:** Efficiently manage and claim mission rewards with the new auto task system.
+- **Gacha Spins:** Spin the gacha automatically to win heroes and resources.
+- **Hero Upgrades:** Enjoy an optimized hero upgrade system for a smoother and more responsive experience.
+- **Challenges:** Deploy your heroes to challenges to earn extra rewards.
+- **Shop Automation:** Automatically purchase free materials from the shop.
+- **Proxy & Custom Delays:** Support for proxies and configurable delays between loops and account switches for enhanced stability.
 
-- **Hero Management**  
-  Automatically manage your heroes (upgrade and maintenance).
-
-- **Send Heroes to Challenges**  
-  Automatically dispatch your heroes to participate in challenges.
-
-- **Shop Automation**  
-  Automate shop purchases and refreshes.
-
-- **Loop Delay & Account Switching**  
-  Set custom delays between loops and account switches for smoother operation.
-
-With this bot, you can optimize your gameplay and focus on strategy rather than repetitive manual tasks.
-
-Below is the updated version information with the previous update details removed. The new update focuses solely on fixing the gacha system using gems:
+With these features, the bot maximizes your gameplay efficiency and lets you progress effortlessly.
 
 ---
 
-## 🌟 **Version v1.1.1**
+## 🌟 **Version v1.2.0**
 
 ### **Updates**
 
-- **Gacha System Enhancement:** Fixed issues with gem-based gacha spins to improve reliability and user experience.
+- **Optimized Hero Upgrade System:** The hero upgrade system has been optimized for a smoother and more responsive experience.
+- **Optimized Mission System:** Mission management and reporting have been improved to simplify reward collection.
+- **Auto Daily System Added:** Daily rewards are now automatically claimed for your convenience.
+- **Auto Task System Added:** Tasks and missions are now automated for efficient reward management.
+- **Proxy Support:** The application now supports proxies for more stable access.
 
 Stay tuned for further updates and improvements! ✨
 
@@ -57,14 +52,17 @@ To start using the **sleepagotchiLITE_bot**, simply contact the bot via Telegram
 
 Below is a summary of the configuration options available in `config.json`:
 
-| **Function**                  | **Description**                                      | **Default** |
-| ----------------------------- | ---------------------------------------------------- | ----------- |
-| `spin_gacha`                  | Enable/Disable automatic gacha spins                 | `true`      |
-| `heroes`                      | Enable/Disable hero management automation            | `true`      |
-| `send_heroes_to_challenges`   | Auto-send heroes to challenges                       | `true`      |
-| `shop`                        | Enable/Disable shop automation                       | `true`      |
-| `delay_loop`                  | Delay (in seconds) between each automation loop      | `60`        |
-| `delay_account_switch`        | Delay (in seconds) between account switches          | `10`        |
+| **Parameter**               | **Description**                                                   | **Default** |
+| --------------------------- | ----------------------------------------------------------------- | ----------- |
+| `task`                      | Enable automatic mission management.                              | `true`      |
+| `daily`                     | Enable automatic daily reward claiming.                           | `true`      |
+| `spin_gacha`                | Enable automatic gacha spins.                                     | `true`      |
+| `heroes`                    | Enable automatic hero upgrades.                                   | `true`      |
+| `send_heroes_to_challenges` | Enable automatic deployment of heroes to challenges.              | `true`      |
+| `shop`                      | Enable automatic shop purchases.                                  | `true`      |
+| `proxy`                     | Enable proxy usage (configure proxies in `proxy.txt` if enabled). | `false`     |
+| `delay_loop`                | Delay (in seconds) between each automation loop.                  | `60`        |
+| `delay_account_switch`      | Delay (in seconds) between switching accounts.                    | `10`        |
 
 ---
 
@@ -94,7 +92,16 @@ Below is a summary of the configuration options available in `config.json`:
 4. **Configure Your Query**  
    Create a file named `query.txt` and add your query data in it.
 
-5. **Run the Bot**  
+5. **Set Up Proxy (Optional)**  
+   To use a proxy, create a `proxy.txt` file and add proxies in the format:
+
+   ```
+   http://username:password@ip:port
+   ```
+
+   Only HTTP and HTTPS proxies are supported.
+
+6. **Run the Bot**  
    Start the bot with the following command:
 
    ```bash

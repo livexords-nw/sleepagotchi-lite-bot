@@ -1,8 +1,11 @@
 {
+    "task": true,
+    "daily": true,
     "spin_gacha": true,
     "heroes": true,
     "send_heroes_to_challenges": true,
     "shop": true,
+    "proxy": false,
     "delay_loop": 60,
     "delay_account_switch": 10
 }
