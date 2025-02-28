@@ -22,17 +22,14 @@ With these features, the bot maximizes your gameplay efficiency and lets you pro
 
 ---
 
-## 🌟 **Version v1.2.0**
+## 🌟 **Version v1.3.0**
 
 ### **Updates**
 
-- **Optimized Hero Upgrade System:** The hero upgrade system has been optimized for a smoother and more responsive experience.
-- **Optimized Mission System:** Mission management and reporting have been improved to simplify reward collection.
-- **Auto Daily System Added:** Daily rewards are now automatically claimed for your convenience.
-- **Auto Task System Added:** Tasks and missions are now automated for efficient reward management.
-- **Proxy Support:** The application now supports proxies for more stable access.
+- **Enhanced Mission System:** The mission system has been refined for improved accuracy and reliability during mission fetching and management.
+- **Optimized Upgrade System:** The upgrade system now exclusively processes upgrades for Epic and Legendary tier heroes, ensuring better resource management and performance.
 
-Stay tuned for further updates and improvements! ✨
+## Stay tuned for further updates and improvements! ✨
 
 ---
 
