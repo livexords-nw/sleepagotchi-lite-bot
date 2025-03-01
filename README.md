@@ -22,12 +22,11 @@ With these features, the bot maximizes your gameplay efficiency and lets you pro
 
 ---
 
-## 🌟 **Version v1.3.0**
+## 🌟 **Version v1.3.1**
 
 ### **Updates**
 
 - **Enhanced Mission System:** The mission system has been refined for improved accuracy and reliability during mission fetching and management.
-- **Optimized Upgrade System:** The upgrade system now exclusively processes upgrades for Epic and Legendary tier heroes, ensuring better resource management and performance.
 
 ## Stay tuned for further updates and improvements! ✨
 
