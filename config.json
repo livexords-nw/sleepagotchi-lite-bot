@@ -2,7 +2,6 @@
     "task": true,
     "daily": true,
     "spin_gacha": true,
-    "heroes": true,
     "send_heroes_to_challenges": true,
     "shop": true,
     "proxy": false,

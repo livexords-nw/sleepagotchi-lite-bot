@@ -22,11 +22,12 @@ With these features, the bot maximizes your gameplay efficiency and lets you pro
 
 ---
 
-## 🌟 **Version v1.3.1**
+## 🌟 **Version v1.3.2**
 
 ### **Updates**
 
-- **Enhanced Mission System:** The mission system has been refined for improved accuracy and reliability during mission fetching and management.
+- **Optimized Hero Upgrade System:** Heroes are now upgraded only right before mission execution, ensuring efficient use of resources.
+- **Optimized Mission Deployment:** The mission system now sends only one Legendary hero per mission, while deploying multiple non-Legendary heroes when applicable.
 
 ## Stay tuned for further updates and improvements! ✨
 
@@ -53,7 +54,6 @@ Below is a summary of the configuration options available in `config.json`:
 | `task`                      | Enable automatic mission management.                              | `true`      |
 | `daily`                     | Enable automatic daily reward claiming.                           | `true`      |
 | `spin_gacha`                | Enable automatic gacha spins.                                     | `true`      |
-| `heroes`                    | Enable automatic hero upgrades.                                   | `true`      |
 | `send_heroes_to_challenges` | Enable automatic deployment of heroes to challenges.              | `true`      |
 | `shop`                      | Enable automatic shop purchases.                                  | `true`      |
 | `proxy`                     | Enable proxy usage (configure proxies in `proxy.txt` if enabled). | `false`     |
