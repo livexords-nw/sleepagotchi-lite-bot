@@ -367,7 +367,7 @@ class sleepagotchi:
         # Get user data (heroes & resources)
         try:
             heroes_url = f"{self.BASE_URL}getUserData?{self.token}"
-            hero_response = requests.get(heroes_url, headers=headers)
+            hero_response = requests.get(heroes_url, headers=headers, timeout=5)
             hero_response.raise_for_status()
             user_data = hero_response.json()
             player = user_data.get("player", {})
@@ -388,7 +388,7 @@ class sleepagotchi:
         try:
             self.log("🔍 Fetching hero definitions for upgrades...", Fore.GREEN)
             url_all = f"{self.BASE_URL}getAllHeroes?{self.token}"
-            response_all = requests.get(url_all, headers=headers)
+            response_all = requests.get(url_all, headers=headers, timeout=5)
             response_all.raise_for_status()
             hero_definitions = response_all.json()
             if not hero_definitions:
@@ -402,7 +402,7 @@ class sleepagotchi:
             while True:
                 payload = {"startIndex": start_index, "amount": 6}
                 constellations_url = f"{self.BASE_URL}getConstellations?{self.token}"
-                response = requests.post(constellations_url, headers=headers, json=payload)
+                response = requests.post(constellations_url, headers=headers, json=payload, timeout=5)
                 response.raise_for_status()
                 data = response.json()
                 mission_list = data.get("constellations", [])
@@ -413,7 +413,7 @@ class sleepagotchi:
                 batch_has_locked = False
                 for mission in mission_list:
                     mandatory_slots_unlocked = True
-                    # Check every challenge slot in the mission
+                    # Cek setiap challenge slot di mission
                     for challenge in mission.get("challenges", []):
                         for idx, slot in enumerate(challenge.get("orderedSlots", [])):
                             if not slot.get("optional", False) and not slot.get("unlocked", True):
@@ -484,7 +484,7 @@ class sleepagotchi:
                 payload = {"heroType": hero_type}
                 try:
                     self.log(f"⬆️ Attempting star upgrade for hero '{hero.get('name')}'...", Fore.CYAN)
-                    star_response = requests.post(star_upgrade_url, headers=headers, json=payload)
+                    star_response = requests.post(star_upgrade_url, headers=headers, json=payload, timeout=5)
                     star_response.raise_for_status()
                     star_data = star_response.json()
                     if star_data.get("success", False):
@@ -514,7 +514,7 @@ class sleepagotchi:
                 payload = {"heroType": hero_type, "strategy": "one"}
                 try:
                     self.log(f"⬆️ Attempting level upgrade for hero '{hero.get('name')}'...", Fore.CYAN)
-                    upgrade_response = requests.post(upgrade_url, headers=headers, json=payload)
+                    upgrade_response = requests.post(upgrade_url, headers=headers, json=payload, timeout=5)
                     upgrade_response.raise_for_status()
                     upgrade_data = upgrade_response.json()
 
@@ -536,7 +536,7 @@ class sleepagotchi:
                 self.log(f"ℹ️ Total level upgrades for hero '{hero.get('name')}': {upgrade_count}", Fore.CYAN)
             return hero
 
-        # Set to track heroes already used so they are not reused
+        # Set untuk melacak hero yang sudah digunakan agar tidak dipakai lagi
         used_heroes = set()
 
         # Process each mission
@@ -544,22 +544,19 @@ class sleepagotchi:
             constellation_name = constellation.get("name", "Unknown Mission")
             self.log(f"🔸 Processing mission: {constellation_name}", Fore.CYAN)
 
-            # Check if the mission already has heroes assigned
-            mission_has_assigned = False
+            # Ambil data hero yang sudah digunakan dari challenge yang sudah berjalan,
+            # tapi jangan skip seluruh misi jika ada sebagian challenge yang kosong.
             for challenge in constellation.get("challenges", []):
                 for slot in challenge.get("orderedSlots", []):
-                    assigned = slot.get("occupiedBy", "").strip()
-                    if assigned and assigned.lower() != "empty":
-                        mission_has_assigned = True
-                        used_heroes.add(assigned)
-            if mission_has_assigned:
-                self.log(f"⚠️ Mission '{constellation_name}' already has heroes assigned. Skipping mission.", Fore.YELLOW)
-                continue
+                    if slot.get("unlocked", True):
+                        assigned = slot.get("occupiedBy", "").strip()
+                        if assigned and assigned.lower() != "empty":
+                            used_heroes.add(assigned)
 
-            # Claim rewards to refresh mission status
+            # Claim rewards untuk refresh status mission
             try:
                 claim_url = f"{self.BASE_URL}claimChallengesRewards?{self.token}"
-                claim_response = requests.get(claim_url, headers=headers)
+                claim_response = requests.get(claim_url, headers=headers, timeout=5)
                 claim_response.raise_for_status()
                 self.log(f"🔄 Claimed challenge rewards for mission '{constellation_name}'.", Fore.CYAN)
             except requests.exceptions.RequestException as e:
@@ -569,7 +566,7 @@ class sleepagotchi:
             challenges = constellation.get("challenges", [])
             mission_started = False
 
-            # Process each challenge within the mission
+            # Process setiap challenge dalam misi
             for challenge in challenges:
                 challenge_type = challenge.get("challengeType", "UnknownType")
                 challenge_name = challenge.get("name", "Unnamed Challenge")
@@ -581,62 +578,68 @@ class sleepagotchi:
                     continue
 
                 ordered_slots = challenge.get("orderedSlots", [])
-                if any(slot.get("occupiedBy", "").strip().lower() != "empty" for slot in ordered_slots):
+                # Cek apakah ada slot yang unlocked dan sudah terisi
+                if any(slot.get("occupiedBy", "").strip().lower() != "empty" for slot in ordered_slots if slot.get("unlocked", True)):
                     self.log(f"⚠️ Challenge '{challenge_name}' is already in progress. Skipping.", Fore.YELLOW)
                     for slot in ordered_slots:
-                        assigned = slot.get("occupiedBy", "").strip()
-                        if assigned and assigned.lower() != "empty":
-                            used_heroes.add(assigned)
+                        if slot.get("unlocked", True):
+                            assigned = slot.get("occupiedBy", "").strip()
+                            if assigned and assigned.lower() != "empty":
+                                used_heroes.add(assigned)
                     continue
 
-                # For minimal assignment, only one hero is needed per challenge.
-                # Use the first non-optional slot as the reference for requirements.
-                required_class = None
-                required_level = 0
-                required_stars = 0
-                for slot in ordered_slots:
-                    if not slot.get("optional", False):
-                        required_class = slot.get("heroClass", "").lower()
-                        required_level = challenge.get("minLevel", 1)
-                        required_stars = challenge.get("minStars", 1)
-                        break
-                if required_class is None:
-                    self.log(f"ℹ️ Challenge '{challenge_name}' does not require assignment (all slots optional).", Fore.CYAN)
+                # Ambil slot pertama yang unlocked sebagai referensi untuk persyaratan
+                unlocked_slots = [slot for slot in ordered_slots if slot.get("unlocked", True)]
+                if not unlocked_slots:
+                    self.log(f"⚠️ No unlocked slots available for challenge '{challenge_name}'.", Fore.YELLOW)
                     continue
+                reference_slot = unlocked_slots[0]
+                required_class = reference_slot.get("heroClass", "").lower()
+                required_level = challenge.get("minLevel", 1)
+                required_stars = challenge.get("minStars", 1)
 
                 candidate = None
-                # Search for a candidate hero matching the required class and not already used
+                # Cari candidate hero yang sesuai dan belum digunakan
                 for hero in available_heroes:
                     hero_identifier = hero.get("heroType")
                     if hero_identifier in used_heroes:
                         continue
                     if hero.get("class", "").lower() != required_class:
                         continue
-                    # If the hero already meets the requirements, use it directly
+                    # Jika hero sudah memenuhi persyaratan, gunakan langsung
                     if hero.get("level", 1) >= required_level and hero.get("stars", 1) >= required_stars:
                         candidate = hero
                         break
-                    # Otherwise, pick this hero as a candidate to be upgraded
+                    # Jika belum, jadikan hero tersebut candidate untuk diupgrade
                     candidate = hero
                     break
 
                 if candidate:
                     self.log(f"ℹ️ Candidate found for challenge '{challenge_name}': {candidate.get('name')} (Type: {candidate.get('heroType')}).", Fore.CYAN)
-                    # Upgrade the candidate so it meets the required level and stars
                     candidate = upgrade_hero_for_challenge(candidate, required_level, required_stars)
-                    # Confirm the candidate now meets the minimum requirements
                     if candidate.get("level", 1) < required_level or candidate.get("stars", 1) < required_stars:
                         self.log(f"⚠️ Hero '{candidate.get('name')}' failed to meet the requirements for challenge '{challenge_name}' after upgrades.", Fore.YELLOW)
+                        candidate = None
+
+                if candidate:
+                    # Cari slot yang unlocked dan masih kosong untuk assignment
+                    slot_id = None
+                    for idx, slot in enumerate(ordered_slots):
+                        if slot.get("unlocked", True) and slot.get("occupiedBy", "").strip().lower() == "empty":
+                            slot_id = idx
+                            break
+                    if slot_id is None:
+                        self.log(f"⚠️ No available unlocked slot found for challenge '{challenge_name}'.", Fore.YELLOW)
                         continue
-                    # Only one hero is assigned per challenge
-                    assignment = {"slotId": 0, "heroType": candidate.get("heroType")}
-                    self.log(f"✅ Assigned hero '{candidate.get('name')}' for challenge '{challenge_name}'.", Fore.LIGHTGREEN_EX)
+
+                    assignment = {"slotId": slot_id, "heroType": candidate.get("heroType")}
+                    self.log(f"✅ Assigned hero '{candidate.get('name')}' for challenge '{challenge_name}' in slot {slot_id}.", Fore.LIGHTGREEN_EX)
                     used_heroes.add(candidate.get("heroType"))
                     send_payload = {"challengeType": challenge_type, "heroes": [assignment]}
                     try:
                         self.log(f"🚀 Sending hero for challenge '{challenge_name}'...", Fore.CYAN)
                         send_url = f"{self.BASE_URL}sendToChallenge?{self.token}"
-                        send_response = requests.post(send_url, headers=headers, json=send_payload)
+                        send_response = requests.post(send_url, headers=headers, json=send_payload, timeout=5)
                         send_response.raise_for_status()
                         send_data = send_response.json()
                         if send_data.get("success", False):
@@ -651,7 +654,26 @@ class sleepagotchi:
                             self.log(f"❌ Error sending hero for challenge '{challenge_name}': {e}", Fore.RED)
                             self.log("📄 Sending failed due to server error.", Fore.RED)
                 else:
-                    self.log(f"⚠️ No suitable candidate found for challenge '{challenge_name}'.", Fore.YELLOW)
+                    # Fallback: Jika tidak ada candidate dan masih ada slot yang terkunci (unlocked == False)
+                    if any(not slot.get("unlocked", True) for slot in ordered_slots):
+                        self.log(f"⚠️ No suitable candidate found for challenge '{challenge_name}'. Attempting to open locked slot...", Fore.YELLOW)
+                        open_payload = {"challengeType": challenge_type}
+                        self.log(f"challenge type: {challenge_type}", Fore.CYAN)
+                        try:
+                            self.log(f"🚀 Attempting to open locked slot for challenge '{challenge_name}'...", Fore.CYAN)
+                            open_slot_url = f"{self.BASE_URL}openSlotChallenge?{self.token}"
+                            open_response = requests.post(open_slot_url, headers=headers, json=open_payload, timeout=15)
+                            open_response.raise_for_status()
+                            # Jika response content sudah panjang atau response success bernilai true,
+                            # anggap pembukaan slot berhasil.
+                            if len(open_response.text) > 200 or open_response.json().get("success", False):
+                                self.log(f"🎉 Locked slot opened successfully for challenge '{challenge_name}'.", Fore.GREEN)
+                            else:
+                                self.log(f"⚠️ Failed to open locked slot for challenge '{challenge_name}': {open_response.json().get('message', 'Unknown error')}", Fore.YELLOW)
+                                self.log(f"📄 Response content: {open_response.text}", Fore.RED)
+                        except requests.exceptions.RequestException as e:
+                            self.log(f"❌ Request error while opening locked slot for challenge '{challenge_name}': {e}", Fore.RED)
+                            self.log(f"📄 Response content: {open_response.text if 'open_response' in locals() else 'No response'}", Fore.RED)
 
             self.log(f"🔄 Finished processing challenges for mission '{constellation_name}'.", Fore.CYAN)
             if mission_started:

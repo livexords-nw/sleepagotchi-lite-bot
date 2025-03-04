@@ -22,12 +22,11 @@ With these features, the bot maximizes your gameplay efficiency and lets you pro
 
 ---
 
-## 🌟 **Version v1.3.2**
+## 🌟 **Version v1.3.3**
 
 ### **Updates**
 
-- **Optimized Hero Upgrade System:** Heroes are now upgraded only right before mission execution, ensuring efficient use of resources.
-- **Optimized Mission Deployment:** The mission system now sends only one Legendary hero per mission, while deploying multiple non-Legendary heroes when applicable.
+- **Optimized Mission System:** The bot can now automatically unlock additional slots if no hero is available to fill a specific mission, ensuring smoother mission deployment.
 
 ## Stay tuned for further updates and improvements! ✨
 
