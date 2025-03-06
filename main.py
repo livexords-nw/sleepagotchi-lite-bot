@@ -112,24 +112,47 @@ class sleepagotchi:
             )
             return
 
-        # Retrieve token and construct the new API URL
+        # Retrieve token from query_list (sebagai payload login)
         token = self.query_list[index]
-        req_url = f"{self.BASE_URL}getUserData?{token}"
         self.log(f"📋 Using token: {token[:10]}... (truncated for security)", Fore.CYAN)
 
         headers = {**self.HEADERS}
 
+        # --- Panggilan API Login ---
+        login_url = f"{self.BASE_URL}login"
+        login_payload = {"loginType": "tg", "payload": token}
+        try:
+            self.log("📡 Sending login request...", Fore.CYAN)
+            login_response = requests.post(login_url, headers=headers, json=login_payload)
+            login_response.raise_for_status()
+            login_data = login_response.json()
+            access_token = login_data.get("accessToken")
+            if not access_token:
+                self.log("❌ Login failed: No access token received.", Fore.RED)
+                return
+            # Simpan accessToken ke self.token
+            self.token = access_token
+            self.log("✅ Login API successful. Access token received.", Fore.GREEN)
+        except requests.exceptions.RequestException as e:
+            self.log(f"❌ Request error during login: {e}", Fore.RED)
+            return
+        except ValueError as e:
+            self.log(f"❌ JSON decode error during login: {e}", Fore.RED)
+            return
+
+        # --- Panggilan API getUserData ---
+        # Hapus token dari URL (tidak ditambahkan di query) dan tambahkan header Authorization
+        get_user_data_url = f"{self.BASE_URL}getUserData"
+        headers["Authorization"] = f"Bearer {self.token}"
+        
         try:
             self.log("📡 Sending request to fetch user data...", Fore.CYAN)
-            response = requests.get(req_url, headers=headers)
+            response = requests.get(get_user_data_url, headers=headers)
             response.raise_for_status()
             data = response.json()
 
             # Check if the login is verified
             if data.get("verified", False):
-                # Save token for later use
-                self.token = token
-
                 username = data.get("username", "Unknown")
                 user_id = data.get("userId", "Unknown")
 
@@ -184,14 +207,15 @@ class sleepagotchi:
         """
         Perform a series of gacha spins using different strategies:
         - Paid gacha spins (using self.gachaPoint)
-        - Gem-based gacha spins (if self.gem >= 500)
         - One free gacha spin
         """
+
+        headers = {**self.HEADERS, "Authorization": f"Bearer {self.token}"}
+
         # --- Paid Gacha Spins ---
         while self.gachaPoint > 0:
             self.log("🎰 Initiating paid gacha spin...", Fore.GREEN)
-            url = f"{self.BASE_URL}spendGacha?{self.token}"
-            headers = self.HEADERS.copy()
+            url = f"{self.BASE_URL}spendGacha"
             payload = {"amount": 1, "strategy": "gacha"}
 
             try:
@@ -248,72 +272,15 @@ class sleepagotchi:
                 "😢 No more paid gacha spins left. Please try again later!", Fore.YELLOW
             )
 
-        # --- Gem Gacha Spins ---
-        while self.gem >= 500:
-            self.log("🎰 Initiating gem gacha spin...", Fore.GREEN)
-            url = f"{self.BASE_URL}spendGacha?{self.token}"
-            headers = self.HEADERS.copy()
-            payload = {"amount": 1, "strategy": "gem"}
-
-            try:
-                self.log("📡 Sending gem gacha request...", Fore.CYAN)
-                response = requests.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-                data = response.json()
-
-                heroes = data.get("heroes", [])
-                if heroes:
-                    self.log(
-                        "🎉 Gem gacha spin successful! You've received the following heroes:",
-                        Fore.GREEN,
-                    )
-                    for hero in heroes:
-                        name = hero.get("name", "Unknown")
-                        hero_type = hero.get("heroType", "Unknown")
-                        hero_class = hero.get("class", "Unknown")
-                        rarity = hero.get("rarity", "Unknown")
-                        power = hero.get("power", "Unknown")
-                        self.log(
-                            f"🦸 Name: {name} | 🏷️ Type: {hero_type} | 🛡️ Class: {hero_class} | ⭐ Rarity: {rarity} | ⚡ Power: {power}",
-                            Fore.LIGHTGREEN_EX,
-                        )
-                else:
-                    self.log(
-                        "⚠️ Gem gacha spin failed: No heroes received.", Fore.YELLOW
-                    )
-
-                # Adjust the paid gacha spin counter or gems as needed by your game logic.
-                self.gachaPoint -= 1
-                self.log(f"🔄 Remaining paid gacha spins: {self.gachaPoint}", Fore.CYAN)
-
-            except requests.exceptions.RequestException as e:
-                self.log(f"❌ Request error during gem gacha spin: {e}", Fore.RED)
-                self.log(f"📄 Response content: {response.text}", Fore.RED)
-                break
-            except ValueError as e:
-                self.log(f"❌ JSON decode error during gem gacha spin: {e}", Fore.RED)
-                self.log(f"📄 Response content: {response.text}", Fore.RED)
-                break
-            except KeyError as e:
-                self.log(
-                    f"❌ Missing expected data during gem gacha spin: {e}", Fore.RED
-                )
-                self.log(f"📄 Response content: {response.text}", Fore.RED)
-                break
-            except Exception as e:
-                self.log(f"❌ Unexpected error during gem gacha spin: {e}", Fore.RED)
-                self.log(f"📄 Response content: {response.text}", Fore.RED)
-                break
-
         # --- Free Gacha Spin ---
         self.log("🎰 Initiating free gacha spin...", Fore.GREEN)
-        free_url = f"{self.BASE_URL}spendGacha?{self.token}"
+        free_url = f"{self.BASE_URL}spendGacha"
         free_payload = {"amount": 1, "strategy": "free"}
 
         try:
             self.log("📡 Sending free gacha request...", Fore.CYAN)
             free_response = requests.post(
-                free_url, headers=self.HEADERS, json=free_payload
+                free_url, headers=headers, json=free_payload
             )
             free_response.raise_for_status()
             free_data = free_response.json()
@@ -352,9 +319,9 @@ class sleepagotchi:
 
     def send_heroes_to_challenges(self) -> None:
         self.log("🚀 Initiating mission deployment...", Fore.GREEN)
-        headers = {**self.HEADERS}
+        headers = {**self.HEADERS, "Authorization": f"Bearer {self.token}"}
 
-        # Fungsi helper untuk melakukan request dengan mekanisme retry saat timeout
+        # Fungsi helper untuk request dengan retry
         def request_with_retry(method: str, url: str, headers: dict, json_payload=None, timeout=5):
             import time
             while True:
@@ -366,14 +333,14 @@ class sleepagotchi:
                     response.raise_for_status()
                     return response
                 except requests.exceptions.Timeout:
-                    self.log(f"⏳ Timeout occurred Retrying...", Fore.YELLOW)
+                    self.log(f"⏳ Timeout occurred on {url}. Retrying...", Fore.YELLOW)
                     time.sleep(1)
                     continue
                 except requests.exceptions.RequestException as e:
                     self.log(f"❌ Request error for {url}: {e}", Fore.RED)
                     raise e
 
-        # Helper function to evaluate an upgrade formula
+        # Helper untuk evaluasi formula upgrade
         def evaluate_formula(formula: str, level: float, star: float) -> float:
             safe_formula = formula.replace("^", "**")
             try:
@@ -383,9 +350,9 @@ class sleepagotchi:
                 self.log(f"❌ Error evaluating formula '{formula}': {e}", Fore.RED)
                 return 0
 
-        # Get user data (heroes & resources)
+        # Ambil data user (heroes & resources)
         try:
-            heroes_url = f"{self.BASE_URL}getUserData?{self.token}"
+            heroes_url = f"{self.BASE_URL}getUserData"
             hero_response = request_with_retry("get", heroes_url, headers, timeout=5)
             user_data = hero_response.json()
             player = user_data.get("player", {})
@@ -393,32 +360,30 @@ class sleepagotchi:
             if not available_heroes:
                 self.log("⚠️ No heroes in your collection!", Fore.YELLOW)
                 return
-            # Juga ambil hero cards yang digunakan untuk upgrade bintang
             resources = player.get("resources", {})
             hero_cards = resources.get("heroCard", {})
             self.log(f"🤩 Found {len(available_heroes)} heroes from user data.", Fore.CYAN)
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             self.log(f"❌ Error fetching hero data: {e}", Fore.RED)
-            self.log(f"📄 Response: {hero_response.text if 'hero_response' in locals() else 'No response'}", Fore.RED)
             return
 
-        # Fetch hero definitions needed for upgrades and mission requirements
+        # Fetch hero definitions dan missions (constellations)
         try:
             self.log("🔍 Fetching hero definitions for upgrades...", Fore.GREEN)
-            url_all = f"{self.BASE_URL}getAllHeroes?{self.token}"
+            url_all = f"{self.BASE_URL}getAllHeroes"
             response_all = request_with_retry("get", url_all, headers, timeout=5)
             hero_definitions = response_all.json()
             if not hero_definitions:
                 self.log("⚠️ No hero definitions found!", Fore.YELLOW)
                 return
 
-            # Fetch missions (constellations)
+            # Ambil missions (constellations)
             constellations = []
             mission_ids = set()
             start_index = 0
             while True:
                 payload = {"startIndex": start_index, "amount": 6}
-                constellations_url = f"{self.BASE_URL}getConstellations?{self.token}"
+                constellations_url = f"{self.BASE_URL}getConstellations"
                 response = request_with_retry("post", constellations_url, headers, json_payload=payload, timeout=5)
                 data = response.json()
                 mission_list = data.get("constellations", [])
@@ -429,7 +394,7 @@ class sleepagotchi:
                 batch_has_locked = False
                 for mission in mission_list:
                     mandatory_slots_unlocked = True
-                    # Cek setiap challenge slot di mission
+                    # Periksa slot mandatory (slot optional tidak menghalangi)
                     for challenge in mission.get("challenges", []):
                         for idx, slot in enumerate(challenge.get("orderedSlots", [])):
                             if not slot.get("optional", False) and not slot.get("unlocked", True):
@@ -438,43 +403,52 @@ class sleepagotchi:
                                 break
                         if not mandatory_slots_unlocked:
                             break
-
                     if not mandatory_slots_unlocked:
                         self.log(f"🔒 Mission '{mission.get('name', 'Unknown')}' has locked mandatory slots. Stopping mission fetch.", Fore.YELLOW)
                         batch_has_locked = True
                         break
-
                     unique_id = mission.get("id", mission.get("name"))
                     if unique_id not in mission_ids:
                         constellations.append(mission)
                         mission_ids.add(unique_id)
                         self.log(f"✨ Found mission: {mission.get('name', 'Unknown')}.", Fore.CYAN)
-
                 if batch_has_locked:
                     break
                 start_index += len(mission_list)
-
             if not constellations:
                 self.log("⚠️ No missions with all mandatory slots unlocked.", Fore.YELLOW)
                 return
-
             self.log(f"✨ Found {len(constellations)} missions.", Fore.CYAN)
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             self.log(f"❌ Error fetching missions: {e}", Fore.RED)
-            self.log(f"📄 Response: {response.text if 'response' in locals() else 'No response'}", Fore.RED)
             return
 
-        # Helper function: Upgrade hero (both star and level) to meet the challenge requirements
+        # Claim challenge rewards sekali saja
+        try:
+            claim_rewards_url = f"{self.BASE_URL}claimChallengesRewards"
+            _ = request_with_retry("get", claim_rewards_url, headers, timeout=5)
+            self.log("🔄 Claimed challenge rewards.", Fore.CYAN)
+        except Exception as e:
+            self.log(f"❌ Error claiming challenge rewards: {e}", Fore.RED)
+
+        # Helper: Upgrade hero (stars & level) untuk memenuhi persyaratan challenge
         def upgrade_hero_for_challenge(hero: dict, required_level: int, required_stars: int) -> dict:
+            """
+            Upgrade candidate hero untuk memenuhi syarat challenge.
+            Jika upgrade bintang tidak memungkinkan karena kekurangan hero card,
+            maka akan dicari hero lain (selain kandidat utama) yang memiliki bintang di bawah standar 
+            dan level > 1 untuk di-reset guna mendapatkan resource, dengan syarat self.gem >= 100.
+            """
+            headers = {**self.HEADERS, "Authorization": f"Bearer {self.token}"}
             hero_type = hero.get("heroType")
             matching_def = next((d for d in hero_definitions if d.get("heroType") == hero_type), None)
             if not matching_def:
                 self.log(f"⚠️ No hero definition found for heroType: {hero_type}", Fore.YELLOW)
                 return hero
 
-            # --- Upgrade Star if needed ---
+            # --- Upgrade Star ---
             while hero.get("stars", 1) < required_stars:
-                # Check if the hero card for this hero is available
+                # Cari hero card untuk hero ini
                 card_available = None
                 if isinstance(hero_cards, dict):
                     for key, card in hero_cards.items():
@@ -486,41 +460,68 @@ class sleepagotchi:
                         if card.get("heroType") == hero_type:
                             card_available = card
                             break
-                if not card_available:
-                    self.log(f"⚠️ No hero card available for star upgrade for hero '{hero.get('name')}'.", Fore.YELLOW)
-                    break
 
-                available_amount = card_available.get("amount", 0)
-                cost_star = hero.get("costStar", 0)
-                if available_amount < cost_star:
-                    self.log(f"⚠️ Not enough hero cards for star upgrade for hero '{hero.get('name')}' (Required: {cost_star}, Available: {available_amount}).", Fore.YELLOW)
-                    break
-
-                star_upgrade_url = f"{self.BASE_URL}starUpHero?{self.token}"
-                payload = {"heroType": hero_type}
-                try:
-                    self.log(f"⬆️ Attempting star upgrade for hero '{hero.get('name')}'...", Fore.CYAN)
-                    star_response = request_with_retry("post", star_upgrade_url, headers, json_payload=payload, timeout=5)
-                    star_data = star_response.json()
-                    if star_data.get("success", False):
-                        # Assume the response returns updated hero data (with increased stars)
-                        hero = star_data.get("hero", hero)
-                        card_available["amount"] = available_amount - cost_star
-                        self.log(f"🎉 Star upgrade successful: Hero '{hero.get('name')}' now has {hero.get('stars', '?')} stars.", Fore.GREEN)
-                    else:
-                        self.log(f"⚠️ Star upgrade failed for hero '{hero.get('name')}': {star_data.get('message', 'Unknown error')}", Fore.YELLOW)
+                if card_available and card_available.get("amount", 0) >= hero.get("costStar", 0):
+                    payload = {"heroType": hero_type}
+                    star_upgrade_url = f"{self.BASE_URL}starUpHero"
+                    try:
+                        self.log(f"⬆️ Attempting star upgrade for hero '{hero.get('name')}'...", Fore.CYAN)
+                        star_response = request_with_retry("post", star_upgrade_url, headers, json_payload=payload, timeout=5)
+                        star_data = star_response.json()
+                        if star_data.get("success", False):
+                            hero = star_data.get("hero", hero)
+                            available_amount = card_available.get("amount", 0)
+                            card_available["amount"] = available_amount - hero.get("costStar", 0)
+                            self.log(f"🎉 Star upgrade successful: Hero '{hero.get('name')}' now has {hero.get('stars', '?')} stars.", Fore.GREEN)
+                            continue  # Periksa kembali apakah sudah memenuhi syarat
+                        else:
+                            self.log(f"⚠️ Star upgrade failed for hero '{hero.get('name')}': {star_data.get('message', 'Unknown error')}", Fore.YELLOW)
+                            break
+                    except Exception as e:
+                        self.log(f"❌ Request error during star upgrade for hero '{hero.get('name')}': {e}", Fore.RED)
                         break
-                except requests.exceptions.RequestException as e:
-                    self.log(f"❌ Request error during star upgrade for hero '{hero.get('name')}': {e}", Fore.RED)
-                    break
+                else:
+                    self.log(f"⚠️ Insufficient hero cards for star upgrade for hero '{hero.get('name')}'.", Fore.YELLOW)
+                    # Jika tidak cukup hero card, coba reset dengan syarat level > 1 dan self.gem >= 100
+                    if hero.get("level", 1) > 1 and self.gem >= 100:
+                        reset_candidates = [
+                            h for h in available_heroes
+                            if h.get("heroType") != hero_type
+                            and h.get("stars", 1) < required_stars
+                            and h.get("level", 1) > 1
+                        ]
+                        if reset_candidates:
+                            reset_candidate = max(reset_candidates, key=lambda h: h.get("level", 1))
+                            reset_url = f"{self.BASE_URL}resetHero"
+                            reset_payload = {"heroType": reset_candidate.get("heroType")}
+                            try:
+                                self.log(f"♻️ Resetting hero '{reset_candidate.get('name')}' (Level: {reset_candidate.get('level')}, Stars: {reset_candidate.get('stars')}) for resource generation...", Fore.CYAN)
+                                reset_response = request_with_retry("post", reset_url, headers, json_payload=reset_payload, timeout=5)
+                                reset_data = reset_response.json()
+                                if "gold" in reset_data:
+                                    self.coin = reset_data["gold"].get("amount", self.coin)
+                                if "greenStones" in reset_data:
+                                    self.green_stones = reset_data["greenStones"].get("amount", self.green_stones)
+                                self.log(f"✅ Reset successful for hero '{reset_candidate.get('name')}'. Resources updated.", Fore.GREEN)
+                                # Setelah reset, lanjutkan loop upgrade kandidat
+                                continue
+                            except Exception as e:
+                                self.log(f"❌ Error resetting hero '{reset_candidate.get('name')}': {e}", Fore.RED)
+                                break
+                        else:
+                            self.log("⚠️ No eligible hero found for reset.", Fore.YELLOW)
+                            break
+                    else:
+                        self.log(f"⚠️ Hero '{hero.get('name')}' cannot be reset (level is 1 or insufficient gems).", Fore.YELLOW)
+                        break
 
-            # --- Upgrade Level if needed ---
-            upgrade_url = f"{self.BASE_URL}levelUpHero?{self.token}"
+            # --- Upgrade Level ---
+            upgrade_url = f"{self.BASE_URL}levelUpHero"
             upgrade_count = 0
             while hero.get("level", 1) < required_level:
                 cost_gold = evaluate_formula(matching_def.get("costLevelGoldFormula", "0"), hero.get("level", 1), hero.get("stars", 1))
                 cost_green = evaluate_formula(matching_def.get("costLevelGreenFormula", "0"), hero.get("level", 1), hero.get("stars", 1))
-                cost_purple = 0  # Add purple formula if applicable
+                cost_purple = 0  # Tambahkan jika diperlukan
 
                 if self.coin < cost_gold or self.green_stones < cost_green or self.purple_stones < cost_purple:
                     self.log(f"⚠️ Not enough resources to upgrade level for hero '{hero.get('name')}'.", Fore.YELLOW)
@@ -531,177 +532,142 @@ class sleepagotchi:
                     self.log(f"⬆️ Attempting level upgrade for hero '{hero.get('name')}'...", Fore.CYAN)
                     upgrade_response = request_with_retry("post", upgrade_url, headers, json_payload=payload, timeout=5)
                     upgrade_data = upgrade_response.json()
-
                     spent_gold = upgrade_data.get("spentGold", 0)
                     spent_green = upgrade_data.get("spentGreenStones", 0)
                     spent_purple = upgrade_data.get("spentPurpleStones", 0)
-
                     self.coin -= spent_gold
                     self.green_stones -= spent_green
                     self.purple_stones -= spent_purple
-
                     hero = upgrade_data.get("hero", hero)
                     upgrade_count += 1
                     self.log(f"✅ Level upgrade #{upgrade_count} successful for hero '{hero.get('name')}' (Level: {hero.get('level')}).", Fore.GREEN)
-                except requests.exceptions.RequestException as e:
+                except Exception as e:
                     self.log(f"❌ Request error during level upgrade for hero '{hero.get('name')}': {e}", Fore.RED)
                     break
             if upgrade_count > 0:
                 self.log(f"ℹ️ Total level upgrades for hero '{hero.get('name')}': {upgrade_count}", Fore.CYAN)
             return hero
 
-        # Set untuk melacak hero yang sudah digunakan agar tidak dipakai lagi
+        # Set untuk melacak hero yang sudah digunakan (tidak dipakai ulang)
         used_heroes = set()
-
-        # Process each mission
+        # Proses setiap mission (constellation)
         for constellation in constellations:
             constellation_name = constellation.get("name", "Unknown Mission")
             self.log(f"🔸 Processing mission: {constellation_name}", Fore.CYAN)
-
-            # Ambil data hero yang sudah digunakan dari challenge yang sudah berjalan,
-            # tapi jangan skip seluruh misi jika ada sebagian challenge yang kosong.
+            # Kumpulkan hero yang sudah terpakai di challenge sebelumnya
             for challenge in constellation.get("challenges", []):
                 for slot in challenge.get("orderedSlots", []):
                     if slot.get("unlocked", True):
                         assigned = slot.get("occupiedBy", "").strip()
                         if assigned and assigned.lower() != "empty":
                             used_heroes.add(assigned)
-
-            # Claim rewards untuk refresh status mission
-            try:
-                claim_url = f"{self.BASE_URL}claimChallengesRewards?{self.token}"
-                claim_response = request_with_retry("get", claim_url, headers, timeout=5)
-                self.log(f"🔄 Claimed challenge rewards for mission '{constellation_name}'.", Fore.CYAN)
-            except requests.exceptions.RequestException as e:
-                self.log(f"❌ Error claiming rewards for mission '{constellation_name}': {e}", Fore.RED)
-                self.log("📄 (Response not shown)", Fore.RED)
-
             challenges = constellation.get("challenges", [])
             mission_started = False
-
-            # Process setiap challenge dalam misi
             for challenge in challenges:
                 challenge_type = challenge.get("challengeType", "UnknownType")
                 challenge_name = challenge.get("name", "Unnamed Challenge")
                 received = challenge.get("received", 0)
                 value = challenge.get("value", 0)
-
                 if received >= value:
                     self.log(f"⚠️ Challenge '{challenge_name}' is complete (received: {received}, required: {value}). Skipping.", Fore.YELLOW)
                     continue
-
                 ordered_slots = challenge.get("orderedSlots", [])
-                # Cek apakah ada slot yang unlocked dan sudah terisi
-                if any(slot.get("occupiedBy", "").strip().lower() != "empty" for slot in ordered_slots if slot.get("unlocked", True)):
-                    self.log(f"⚠️ Challenge '{challenge_name}' is already in progress. Skipping.", Fore.YELLOW)
-                    for slot in ordered_slots:
-                        if slot.get("unlocked", True):
-                            assigned = slot.get("occupiedBy", "").strip()
-                            if assigned and assigned.lower() != "empty":
-                                used_heroes.add(assigned)
+                if not ordered_slots:
+                    self.log(f"⚠️ No slots available for challenge '{challenge_name}'.", Fore.YELLOW)
                     continue
-
-                # Ambil slot pertama yang unlocked sebagai referensi untuk persyaratan
-                unlocked_slots = [slot for slot in ordered_slots if slot.get("unlocked", True)]
-                if not unlocked_slots:
-                    self.log(f"⚠️ No unlocked slots available for challenge '{challenge_name}'.", Fore.YELLOW)
-                    continue
-                reference_slot = unlocked_slots[0]
-                required_class = reference_slot.get("heroClass", "").lower()
-                required_level = challenge.get("minLevel", 1)
-                required_stars = challenge.get("minStars", 1)
-
-                candidate = None
-                # Cari candidate hero yang sesuai dan belum digunakan
-                for hero in available_heroes:
-                    hero_identifier = hero.get("heroType")
-                    if hero_identifier in used_heroes:
-                        continue
-                    if hero.get("class", "").lower() != required_class:
-                        continue
-                    # Jika hero sudah memenuhi persyaratan, gunakan langsung
-                    if hero.get("level", 1) >= required_level and hero.get("stars", 1) >= required_stars:
-                        candidate = hero
-                        break
-                    # Jika belum, jadikan hero tersebut candidate untuk diupgrade
-                    candidate = hero
-                    break
-
-                if candidate:
-                    self.log(f"ℹ️ Candidate found for challenge '{challenge_name}': {candidate.get('name')} (Type: {candidate.get('heroType')}).", Fore.CYAN)
-                    candidate = upgrade_hero_for_challenge(candidate, required_level, required_stars)
-                    if candidate.get("level", 1) < required_level or candidate.get("stars", 1) < required_stars:
-                        self.log(f"⚠️ Hero '{candidate.get('name')}' failed to meet the requirements for challenge '{challenge_name}' after upgrades.", Fore.YELLOW)
+                # Dapatkan daftar slot unlocked (kosong) untuk assignment
+                unlocked_slots = [ (idx, slot) for idx, slot in enumerate(ordered_slots)
+                                if slot.get("unlocked", True) and slot.get("occupiedBy", "").strip().lower() == "empty" ]
+                # Jika belum ada kandidat di seluruh slot unlocked, kita coba iterasi semua slot dari slot paling depan (indeks terkecil)
+                assignments = []
+                if unlocked_slots:
+                    # Urutkan berdasarkan indeks naik (paling depan dulu)
+                    for idx, slot in sorted(unlocked_slots, key=lambda x: x[0]):
+                        # Cari kandidat untuk slot tersebut: hero yang belum digunakan dan sesuai class
+                        required_class = slot.get("heroClass", "").lower()
+                        required_level = challenge.get("minLevel", 1)
+                        required_stars = challenge.get("minStars", 1)
+                        def upgrade_steps(hero):
+                            level_steps = max(0, required_level - hero.get("level", 1))
+                            star_steps = max(0, required_stars - hero.get("stars", 1))
+                            return level_steps + star_steps
+                        candidates = [
+                            hero for hero in available_heroes
+                            if hero.get("heroType") not in used_heroes and hero.get("class", "").lower() == required_class
+                        ]
                         candidate = None
-
-                if candidate:
-                    # Cari slot yang unlocked dan masih kosong untuk assignment
-                    slot_id = None
-                    for idx, slot in enumerate(ordered_slots):
-                        if slot.get("unlocked", True) and slot.get("occupiedBy", "").strip().lower() == "empty":
-                            slot_id = idx
-                            break
-                    if slot_id is None:
-                        self.log(f"⚠️ No available unlocked slot found for challenge '{challenge_name}'.", Fore.YELLOW)
-                        continue
-
-                    assignment = {"slotId": slot_id, "heroType": candidate.get("heroType")}
-                    self.log(f"✅ Assigned hero '{candidate.get('name')}' for challenge '{challenge_name}' in slot {slot_id}.", Fore.LIGHTGREEN_EX)
-                    used_heroes.add(candidate.get("heroType"))
-                    send_payload = {"challengeType": challenge_type, "heroes": [assignment]}
-                    try:
-                        self.log(f"🚀 Sending hero for challenge '{challenge_name}'...", Fore.CYAN)
-                        send_url = f"{self.BASE_URL}sendToChallenge?{self.token}"
-                        send_response = request_with_retry("post", send_url, headers, json_payload=send_payload, timeout=5)
-                        send_data = send_response.json()
-                        if send_data.get("success", False):
-                            self.log(f"🎉 Challenge '{challenge_name}' initiated with 1 hero.", Fore.GREEN)
-                            mission_started = True
+                        if candidates:
+                            # Pilih kandidat yang paling mendekati standar
+                            candidate = min(candidates, key=upgrade_steps)
+                            self.log(
+                                f"ℹ️ Candidate for challenge '{challenge_name}' (slot {idx}): {candidate.get('name')} "
+                                f"(Type: {candidate.get('heroType')}, Level: {candidate.get('level')}, Stars: {candidate.get('stars')}) - Upgrade steps: {upgrade_steps(candidate)}",
+                                Fore.CYAN,
+                            )
+                            # Jika belum memenuhi standar, coba upgrade (atau reset jika perlu)
+                            if candidate.get("level", 1) < required_level or candidate.get("stars", 1) < required_stars:
+                                candidate = upgrade_hero_for_challenge(candidate, required_level, required_stars)
+                            if candidate.get("level", 1) >= required_level and candidate.get("stars", 1) >= required_stars:
+                                assignments.append({"slotId": idx, "heroType": candidate.get("heroType")})
+                                used_heroes.add(candidate.get("heroType"))
+                            else:
+                                self.log(f"⚠️ Hero '{candidate.get('name')}' fails to meet requirements for slot {idx} in challenge '{challenge_name}' even after upgrade/reset.", Fore.YELLOW)
                         else:
-                            self.log(f"⚠️ Challenge '{challenge_name}' failed to initiate.", Fore.YELLOW)
-                    except requests.exceptions.RequestException as e:
-                        if "error_challenge_in_progress" in str(e) or ("error_challenge_in_progress" in send_response.text):
-                            self.log(f"⚠️ Challenge '{challenge_name}' is already in progress. Skipping.", Fore.YELLOW)
-                        else:
-                            self.log(f"❌ Error sending hero for challenge '{challenge_name}': {e}", Fore.RED)
+                            self.log(f"⚠️ No candidate available for slot {idx} in challenge '{challenge_name}'.", Fore.YELLOW)
+                    # Jika sudah terkumpul minimal satu assignment, kirim semua sekaligus
+                    if assignments:
+                        send_payload = {"challengeType": challenge_type, "heroes": assignments}
+                        try:
+                            self.log(f"🚀 Sending heroes for challenge '{challenge_name}' with assignments: {assignments}", Fore.CYAN)
+                            send_url = f"{self.BASE_URL}sendToChallenge"
+                            send_response = request_with_retry("post", send_url, headers, json_payload=send_payload, timeout=5)
+                            send_data = send_response.json()
+                            if send_data.get("success", False):
+                                self.log(f"🎉 Challenge '{challenge_name}' initiated with assigned heroes.", Fore.GREEN)
+                                mission_started = True
+                            else:
+                                self.log(f"⚠️ Challenge '{challenge_name}' failed to initiate.", Fore.YELLOW)
+                        except Exception as e:
+                            self.log(f"❌ Error sending heroes for challenge '{challenge_name}': {e}", Fore.RED)
                             self.log("📄 Sending failed due to server error.", Fore.RED)
+                    else:
+                        self.log(f"⚠️ No suitable candidate found for any unlocked slot in challenge '{challenge_name}'.", Fore.YELLOW)
                 else:
-                    # Fallback: Jika tidak ada candidate dan masih ada slot yang terkunci (unlocked == False)
+                    self.log(f"⚠️ No unlocked slot available for challenge '{challenge_name}'.", Fore.YELLOW)
+                # Fallback: Jika tidak ada assignment, coba buka slot terkunci dan ulangi proses
+                if not assignments:
                     if any(not slot.get("unlocked", True) for slot in ordered_slots):
-                        self.log(f"⚠️ No suitable candidate found for challenge '{challenge_name}'. Attempting to open locked slot...", Fore.YELLOW)
+                        self.log(f"⚠️ Attempting to open a locked slot for challenge '{challenge_name}' as fallback...", Fore.YELLOW)
                         open_payload = {"challengeType": challenge_type}
-                        self.log(f"challenge type: {challenge_type}", Fore.CYAN)
                         try:
                             self.log(f"🚀 Attempting to open locked slot for challenge '{challenge_name}'...", Fore.CYAN)
-                            open_slot_url = f"{self.BASE_URL}openSlotChallenge?{self.token}"
+                            open_slot_url = f"{self.BASE_URL}openSlotChallenge"
                             open_response = request_with_retry("post", open_slot_url, headers, json_payload=open_payload, timeout=15)
-                            # Jika response content sudah panjang atau response success bernilai true,
-                            # anggap pembukaan slot berhasil.
                             if len(open_response.text) > 200 or open_response.json().get("success", False):
                                 self.log(f"🎉 Locked slot opened successfully for challenge '{challenge_name}'.", Fore.GREEN)
                             else:
                                 self.log(f"⚠️ Failed to open locked slot for challenge '{challenge_name}': {open_response.json().get('message', 'Unknown error')}", Fore.YELLOW)
-                                self.log(f"📄 Response content: {open_response.text}", Fore.RED)
-                        except requests.exceptions.RequestException as e:
+                                self.log(f"📄 Response: {open_response.text}", Fore.RED)
+                        except Exception as e:
                             self.log(f"❌ Request error while opening locked slot for challenge '{challenge_name}': {e}", Fore.RED)
-                            self.log(f"📄 Response content: {open_response.text if 'open_response' in locals() else 'No response'}", Fore.RED)
+                            self.log(f"📄 Response: {open_response.text if 'open_response' in locals() else 'No response'}", Fore.RED)
 
             self.log(f"🔄 Finished processing challenges for mission '{constellation_name}'.", Fore.CYAN)
             if mission_started:
                 self.log(f"✅ Mission '{constellation_name}' initiated successfully.", Fore.GREEN)
             else:
                 self.log(f"⚠️ No challenge in mission '{constellation_name}' could be started.", Fore.YELLOW)
-
         self.log("🏁 Mission deployment completed!", Fore.GREEN)
 
     def shop(self) -> None:
         self.log("🛒 Initiating free material purchase...", Fore.GREEN)
-        url = f"{self.BASE_URL}buyShop?{self.token}"
+        url = f"{self.BASE_URL}buyShop"
         payload = {"slotType": "free"}
+        headers = {**self.HEADERS, "Authorization": f"Bearer {self.token}"}
 
         try:
             self.log("💳 Sending purchase request to the shop...", Fore.CYAN)
-            response = requests.post(url, headers=self.HEADERS, json=payload)
+            response = requests.post(url, headers=headers, json=payload)
             response.raise_for_status()
             data = response.json()
 
@@ -734,12 +700,11 @@ class sleepagotchi:
         Retrieve and claim the daily reward:
         - Retrieve daily rewards from the API endpoint.
         - Find the reward with state "available" and display its type, amount, and day.
-        - Claim the daily reward using the claim API endpoint.
+        - If there is an available reward, claim it using the claim API endpoint.
         """
-        # --- Retrieve Daily Rewards ---
         self.log("📅 Retrieving daily rewards...", Fore.GREEN)
-        url = f"{self.BASE_URL}getDailyRewards?{self.token}"
-        headers = self.HEADERS.copy()
+        url = f"{self.BASE_URL}getDailyRewards"
+        headers = {**self.HEADERS, "Authorization": f"Bearer {self.token}"}
 
         try:
             self.log("📡 Sending request to get daily rewards...", Fore.CYAN)
@@ -748,10 +713,8 @@ class sleepagotchi:
             data = response.json()
             rewards_list = data.get("rewards", [])
 
-            # Find rewards with state "available"
-            available_rewards = [
-                r for r in rewards_list if r.get("state") == "available"
-            ]
+            # Cari reward dengan state "available"
+            available_rewards = [r for r in rewards_list if r.get("state") == "available"]
             if available_rewards:
                 for reward in available_rewards:
                     reward_type = reward.get("rewardType", "Unknown")
@@ -762,35 +725,29 @@ class sleepagotchi:
                         Fore.LIGHTGREEN_EX,
                     )
             else:
-                self.log("⚠️ No available daily rewards found.", Fore.YELLOW)
+                self.log("⚠️ No available daily rewards found. Skipping claim.", Fore.YELLOW)
+                return  # Tidak lanjut ke proses klaim jika tidak ada reward yang tersedia
 
         except requests.exceptions.RequestException as e:
             self.log(f"❌ Request error while retrieving daily rewards: {e}", Fore.RED)
             self.log(f"📄 Response content: {response.text}", Fore.RED)
             return
         except ValueError as e:
-            self.log(
-                f"❌ JSON decode error while retrieving daily rewards: {e}", Fore.RED
-            )
+            self.log(f"❌ JSON decode error while retrieving daily rewards: {e}", Fore.RED)
             self.log(f"📄 Response content: {response.text}", Fore.RED)
             return
         except KeyError as e:
-            self.log(
-                f"❌ Missing expected data while retrieving daily rewards: {e}",
-                Fore.RED,
-            )
+            self.log(f"❌ Missing expected data while retrieving daily rewards: {e}", Fore.RED)
             self.log(f"📄 Response content: {response.text}", Fore.RED)
             return
         except Exception as e:
-            self.log(
-                f"❌ Unexpected error while retrieving daily rewards: {e}", Fore.RED
-            )
+            self.log(f"❌ Unexpected error while retrieving daily rewards: {e}", Fore.RED)
             self.log(f"📄 Response content: {response.text}", Fore.RED)
             return
 
         # --- Claim Daily Reward ---
         self.log("📅 Claiming daily reward...", Fore.GREEN)
-        claim_url = f"{self.BASE_URL}claimDailyRewards?{self.token}"
+        claim_url = f"{self.BASE_URL}claimDailyRewards"
         try:
             self.log("📡 Sending request to claim daily reward...", Fore.CYAN)
             claim_response = requests.get(claim_url, headers=headers)
@@ -811,19 +768,19 @@ class sleepagotchi:
             self.log(f"❌ JSON decode error while claiming daily reward: {e}", Fore.RED)
             self.log(f"📄 Response content: {claim_response.text}", Fore.RED)
         except KeyError as e:
-            self.log(
-                f"❌ Missing expected data while claiming daily reward: {e}", Fore.RED
-            )
+            self.log(f"❌ Missing expected data while claiming daily reward: {e}", Fore.RED)
             self.log(f"📄 Response content: {claim_response.text}", Fore.RED)
         except Exception as e:
             self.log(f"❌ Unexpected error while claiming daily reward: {e}", Fore.RED)
             self.log(f"📄 Response content: {claim_response.text}", Fore.RED)
 
     def task(self) -> None:
+        # === Langkah 1: Ambil daftar misi awal ===
         self.log("🔍 Fetching missions...", Fore.GREEN)
-        missions_url = f"{self.BASE_URL}getMissions?{self.token}"
+        missions_url = f"{self.BASE_URL}getMissions"
+        headers = {**self.HEADERS, "Authorization": f"Bearer {self.token}"}
         try:
-            response = requests.get(missions_url, headers=self.HEADERS)
+            response = requests.get(missions_url, headers=headers)
             response.raise_for_status()
             data = response.json()
             missions = data.get("missions", [])
@@ -839,52 +796,34 @@ class sleepagotchi:
             self.log(f"❌ JSON decode error: {e}", Fore.RED)
             self.log(f"📄 Response content: {response.text}", Fore.RED)
             return
-        except Exception as e:
-            self.log(f"❌ Unexpected error: {e}", Fore.RED)
-            self.log(f"📄 Response content: {response.text}", Fore.RED)
-            return
 
-        # List each mission for the user.
+        # === Langkah 2: List misi yang didapatkan ===
         for mission in missions:
             mission_key = mission.get("missionKey", "Unknown")
             claimed = mission.get("claimed", False)
             progress = mission.get("progress", 0)
-            availible = mission.get("availible", False)
+            available = mission.get("availible", False)
             rewards = mission.get("rewards", [])
             link = mission.get("link", "")
             self.log(
-                f"📋 Mission: {mission_key} | Claimed: {claimed} | Progress: {progress} | Available: {availible} | Rewards: {rewards} | Link: {link}",
+                f"📋 Mission: {mission_key} | Claimed: {claimed} | Progress: {progress} | Available: {available} | Rewards: {rewards} | Link: {link}",
                 Fore.LIGHTGREEN_EX,
             )
 
-        # For each mission, attempt to start and then claim if available.
+        # === Langkah 3: Untuk setiap misi yang belum diklaim dan belum tersedia, mulai misi dengan report event ===
         for mission in missions:
             mission_key = mission.get("missionKey", "Unknown")
-            # If mission is not claimed and not available, try to report the mission event.
-            if not mission.get("claimed", False) and not mission.get(
-                "availible", False
-            ):
-                report_url = f"{self.BASE_URL}reportMissionEvent?{self.token}"
+            if not mission.get("claimed", False) and not mission.get("availible", False):
+                report_url = f"{self.BASE_URL}reportMissionEvent"
                 payload = {"missionKey": mission_key}
                 try:
-                    self.log(
-                        f"🚀 Reporting mission event for '{mission_key}'...", Fore.CYAN
-                    )
-                    report_response = requests.post(
-                        report_url, headers=self.HEADERS, json=payload
-                    )
+                    self.log(f"🚀 Reporting mission event for '{mission_key}'...", Fore.CYAN)
+                    report_response = requests.post(report_url, headers=headers, json=payload)
                     report_response.raise_for_status()
                     report_data = report_response.json()
-                    self.log(
-                        f"🎉 Mission event reported for '{mission_key}'.", Fore.GREEN
-                    )
-                    # Optionally, display updated mission status:
+                    self.log(f"🎉 Mission event reported for '{mission_key}'.", Fore.GREEN)
                     updated = next(
-                        (
-                            m
-                            for m in report_data.get("missions", [])
-                            if m.get("missionKey") == mission_key
-                        ),
+                        (m for m in report_data.get("missions", []) if m.get("missionKey") == mission_key),
                         None,
                     )
                     if updated:
@@ -893,36 +832,57 @@ class sleepagotchi:
                             Fore.LIGHTGREEN_EX,
                         )
                 except requests.exceptions.RequestException as e:
-                    self.log(
-                        f"❌ Error reporting mission event for '{mission_key}': {e}",
-                        Fore.RED,
-                    )
+                    self.log(f"❌ Error reporting mission event for '{mission_key}': {e}", Fore.RED)
                 except ValueError as e:
-                    self.log(
-                        f"❌ JSON decode error during mission event for '{mission_key}': {e}",
-                        Fore.RED,
-                    )
+                    self.log(f"❌ JSON decode error during mission event for '{mission_key}': {e}", Fore.RED)
 
-            # If mission is available (and not claimed), try to claim it.
+        # === Langkah 4: Re-fetch daftar misi setelah report event ===
+        self.log("🔍 Re-fetching missions after starting events...", Fore.GREEN)
+        try:
+            response = requests.get(missions_url, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            missions = data.get("missions", [])
+            if not missions:
+                self.log("⚠️ No missions found on re-fetch!", Fore.YELLOW)
+                return
+            self.log(f"✨ Retrieved {len(missions)} missions on re-fetch.", Fore.CYAN)
+        except requests.exceptions.RequestException as e:
+            self.log(f"❌ Error re-fetching missions: {e}", Fore.RED)
+            self.log(f"📄 Response content: {response.text}", Fore.RED)
+            return
+        except ValueError as e:
+            self.log(f"❌ JSON decode error on re-fetch: {e}", Fore.RED)
+            self.log(f"📄 Response content: {response.text}", Fore.RED)
+            return
+
+        # === Langkah 5: List ulang misi yang sudah di-re-fetch ===
+        for mission in missions:
+            mission_key = mission.get("missionKey", "Unknown")
+            claimed = mission.get("claimed", False)
+            progress = mission.get("progress", 0)
+            available = mission.get("availible", False)
+            rewards = mission.get("rewards", [])
+            link = mission.get("link", "")
+            self.log(
+                f"📋 [Re-Fetched] Mission: {mission_key} | Claimed: {claimed} | Progress: {progress} | Available: {available} | Rewards: {rewards} | Link: {link}",
+                Fore.LIGHTGREEN_EX,
+            )
+
+        # === Langkah 6: Untuk setiap misi yang sudah tersedia (available) dan belum diklaim, coba untuk klaim ===
+        for mission in missions:
+            mission_key = mission.get("missionKey", "Unknown")
             if not mission.get("claimed", False) and mission.get("availible", False):
-                claim_url = f"{self.BASE_URL}claimMission?{self.token}"
+                claim_url = f"{self.BASE_URL}claimMission"
                 payload = {"missionKey": mission_key}
                 try:
                     self.log(f"🚀 Claiming mission '{mission_key}'...", Fore.CYAN)
-                    claim_response = requests.post(
-                        claim_url, headers=self.HEADERS, json=payload
-                    )
+                    claim_response = requests.post(claim_url, headers=headers, json=payload)
                     claim_response.raise_for_status()
                     claim_data = claim_response.json()
-                    self.log(
-                        f"🎉 Mission '{mission_key}' claimed successfully.", Fore.GREEN
-                    )
+                    self.log(f"🎉 Mission '{mission_key}' claimed successfully.", Fore.GREEN)
                     updated = next(
-                        (
-                            m
-                            for m in claim_data.get("missions", [])
-                            if m.get("missionKey") == mission_key
-                        ),
+                        (m for m in claim_data.get("missions", []) if m.get("missionKey") == mission_key),
                         None,
                     )
                     if updated:
@@ -931,14 +891,9 @@ class sleepagotchi:
                             Fore.LIGHTGREEN_EX,
                         )
                 except requests.exceptions.RequestException as e:
-                    self.log(
-                        f"❌ Error claiming mission '{mission_key}': {e}", Fore.RED
-                    )
+                    self.log(f"❌ Error claiming mission '{mission_key}': {e}", Fore.RED)
                 except ValueError as e:
-                    self.log(
-                        f"❌ JSON decode error during mission claim for '{mission_key}': {e}",
-                        Fore.RED,
-                    )
+                    self.log(f"❌ JSON decode error during mission claim for '{mission_key}': {e}", Fore.RED)
 
     def load_proxies(self, filename="proxy.txt"):
         """

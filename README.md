@@ -22,11 +22,15 @@ With these features, the bot maximizes your gameplay efficiency and lets you pro
 
 ---
 
-## 🌟 **Version v1.3.4**
+## 🌟 **Version v1.3.5**
 
 ### **Updates**
 
-- **Optimized Mission System:** The mission system is now improved compared to the previous version—it can stop immediately if a request times out.
+- **API Updates:** All request APIs have been updated.
+- **Mission System Optimization:** The mission system has been optimized for improved performance.
+- **Hero Reset System:** A hero reset system has been added to missions.
+- **Gacha System Removal:** The gacha system using gems has been removed, prioritizing gems for hero reset.
+- **Minor Function Optimizations:** Several functions have been further optimized.
 
 ## Stay tuned for further updates and improvements! ✨
 
