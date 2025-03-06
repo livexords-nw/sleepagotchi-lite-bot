@@ -22,11 +22,11 @@ With these features, the bot maximizes your gameplay efficiency and lets you pro
 
 ---
 
-## 🌟 **Version v1.3.3**
+## 🌟 **Version v1.3.4**
 
 ### **Updates**
 
-- **Optimized Mission System:** The bot can now automatically unlock additional slots if no hero is available to fill a specific mission, ensuring smoother mission deployment.
+- **Optimized Mission System:** The mission system is now improved compared to the previous version—it can stop immediately if a request times out.
 
 ## Stay tuned for further updates and improvements! ✨
 

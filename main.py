@@ -354,6 +354,25 @@ class sleepagotchi:
         self.log("🚀 Initiating mission deployment...", Fore.GREEN)
         headers = {**self.HEADERS}
 
+        # Fungsi helper untuk melakukan request dengan mekanisme retry saat timeout
+        def request_with_retry(method: str, url: str, headers: dict, json_payload=None, timeout=5):
+            import time
+            while True:
+                try:
+                    if method.lower() == "get":
+                        response = requests.get(url, headers=headers, timeout=timeout)
+                    elif method.lower() == "post":
+                        response = requests.post(url, headers=headers, json=json_payload, timeout=timeout)
+                    response.raise_for_status()
+                    return response
+                except requests.exceptions.Timeout:
+                    self.log(f"⏳ Timeout occurred Retrying...", Fore.YELLOW)
+                    time.sleep(1)
+                    continue
+                except requests.exceptions.RequestException as e:
+                    self.log(f"❌ Request error for {url}: {e}", Fore.RED)
+                    raise e
+
         # Helper function to evaluate an upgrade formula
         def evaluate_formula(formula: str, level: float, star: float) -> float:
             safe_formula = formula.replace("^", "**")
@@ -367,29 +386,27 @@ class sleepagotchi:
         # Get user data (heroes & resources)
         try:
             heroes_url = f"{self.BASE_URL}getUserData?{self.token}"
-            hero_response = requests.get(heroes_url, headers=headers, timeout=5)
-            hero_response.raise_for_status()
+            hero_response = request_with_retry("get", heroes_url, headers, timeout=5)
             user_data = hero_response.json()
             player = user_data.get("player", {})
             available_heroes = player.get("heroes", [])
             if not available_heroes:
                 self.log("⚠️ No heroes in your collection!", Fore.YELLOW)
                 return
-            # Also get hero cards used for star upgrades
+            # Juga ambil hero cards yang digunakan untuk upgrade bintang
             resources = player.get("resources", {})
             hero_cards = resources.get("heroCard", {})
             self.log(f"🤩 Found {len(available_heroes)} heroes from user data.", Fore.CYAN)
         except requests.exceptions.RequestException as e:
             self.log(f"❌ Error fetching hero data: {e}", Fore.RED)
-            self.log(f"📄 Response: {hero_response.text}", Fore.RED)
+            self.log(f"📄 Response: {hero_response.text if 'hero_response' in locals() else 'No response'}", Fore.RED)
             return
 
         # Fetch hero definitions needed for upgrades and mission requirements
         try:
             self.log("🔍 Fetching hero definitions for upgrades...", Fore.GREEN)
             url_all = f"{self.BASE_URL}getAllHeroes?{self.token}"
-            response_all = requests.get(url_all, headers=headers, timeout=5)
-            response_all.raise_for_status()
+            response_all = request_with_retry("get", url_all, headers, timeout=5)
             hero_definitions = response_all.json()
             if not hero_definitions:
                 self.log("⚠️ No hero definitions found!", Fore.YELLOW)
@@ -402,8 +419,7 @@ class sleepagotchi:
             while True:
                 payload = {"startIndex": start_index, "amount": 6}
                 constellations_url = f"{self.BASE_URL}getConstellations?{self.token}"
-                response = requests.post(constellations_url, headers=headers, json=payload, timeout=5)
-                response.raise_for_status()
+                response = request_with_retry("post", constellations_url, headers, json_payload=payload, timeout=5)
                 data = response.json()
                 mission_list = data.get("constellations", [])
                 if not mission_list:
@@ -484,8 +500,7 @@ class sleepagotchi:
                 payload = {"heroType": hero_type}
                 try:
                     self.log(f"⬆️ Attempting star upgrade for hero '{hero.get('name')}'...", Fore.CYAN)
-                    star_response = requests.post(star_upgrade_url, headers=headers, json=payload, timeout=5)
-                    star_response.raise_for_status()
+                    star_response = request_with_retry("post", star_upgrade_url, headers, json_payload=payload, timeout=5)
                     star_data = star_response.json()
                     if star_data.get("success", False):
                         # Assume the response returns updated hero data (with increased stars)
@@ -514,8 +529,7 @@ class sleepagotchi:
                 payload = {"heroType": hero_type, "strategy": "one"}
                 try:
                     self.log(f"⬆️ Attempting level upgrade for hero '{hero.get('name')}'...", Fore.CYAN)
-                    upgrade_response = requests.post(upgrade_url, headers=headers, json=payload, timeout=5)
-                    upgrade_response.raise_for_status()
+                    upgrade_response = request_with_retry("post", upgrade_url, headers, json_payload=payload, timeout=5)
                     upgrade_data = upgrade_response.json()
 
                     spent_gold = upgrade_data.get("spentGold", 0)
@@ -556,8 +570,7 @@ class sleepagotchi:
             # Claim rewards untuk refresh status mission
             try:
                 claim_url = f"{self.BASE_URL}claimChallengesRewards?{self.token}"
-                claim_response = requests.get(claim_url, headers=headers, timeout=5)
-                claim_response.raise_for_status()
+                claim_response = request_with_retry("get", claim_url, headers, timeout=5)
                 self.log(f"🔄 Claimed challenge rewards for mission '{constellation_name}'.", Fore.CYAN)
             except requests.exceptions.RequestException as e:
                 self.log(f"❌ Error claiming rewards for mission '{constellation_name}': {e}", Fore.RED)
@@ -639,8 +652,7 @@ class sleepagotchi:
                     try:
                         self.log(f"🚀 Sending hero for challenge '{challenge_name}'...", Fore.CYAN)
                         send_url = f"{self.BASE_URL}sendToChallenge?{self.token}"
-                        send_response = requests.post(send_url, headers=headers, json=send_payload, timeout=5)
-                        send_response.raise_for_status()
+                        send_response = request_with_retry("post", send_url, headers, json_payload=send_payload, timeout=5)
                         send_data = send_response.json()
                         if send_data.get("success", False):
                             self.log(f"🎉 Challenge '{challenge_name}' initiated with 1 hero.", Fore.GREEN)
@@ -662,8 +674,7 @@ class sleepagotchi:
                         try:
                             self.log(f"🚀 Attempting to open locked slot for challenge '{challenge_name}'...", Fore.CYAN)
                             open_slot_url = f"{self.BASE_URL}openSlotChallenge?{self.token}"
-                            open_response = requests.post(open_slot_url, headers=headers, json=open_payload, timeout=15)
-                            open_response.raise_for_status()
+                            open_response = request_with_retry("post", open_slot_url, headers, json_payload=open_payload, timeout=15)
                             # Jika response content sudah panjang atau response success bernilai true,
                             # anggap pembukaan slot berhasil.
                             if len(open_response.text) > 200 or open_response.json().get("success", False):
